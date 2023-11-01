@@ -1,1 +1,1 @@
-# Labaratory exercises - Advanced Programming
+# Laboratory exercises - Advanced Programming

@@ -89,7 +89,7 @@ class Circle extends Shape{
     }
     @Override
     public float weight() {
-        return (float)(radius*radius*3.14);
+        return (float)(radius*radius*Math.PI);
     }
     @Override
     public void scale(float scaleFactor) {

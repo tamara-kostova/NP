@@ -146,7 +146,7 @@ class Circle extends Shape{
         super(radius);
     }
     public double getArea(){
-        return size*size*3.14;
+        return size*size*Math.PI;
     }
 }
 class IrregularCanvasException extends Exception{

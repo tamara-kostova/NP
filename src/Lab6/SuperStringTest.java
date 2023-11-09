@@ -63,14 +63,13 @@ class SuperString{
         reverseStrings(last);
     }
     public void reverseStrings(LinkedList<String> strings){
-        for (String s: strings){
+        for (int i=0;i<strings.size();i++) {
             StringBuilder sb = new StringBuilder();
-            sb.append(s);
+            sb.append(strings.get(i));
             sb.reverse();
-            list.add(sb.toString());
+            strings.set(i,sb.toString());
         }
     }
-
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

@@ -64,7 +64,7 @@ class Quiz{
             questions.add(new MCQuestion(parts[1],Integer.parseInt(parts[2]),parts[3]));
         }
         else
-            questions.add(new TFQuestion(parts[1],Integer.parseInt(parts[2]),parts[3]));
+            questions.add(new TFQuestion(parts[1],Integer.parseInt(parts[2]),Boolean.parseBoolean(parts[3])));
     }
     public void printQuiz(OutputStream os){
         Collections.sort(questions,Collections.reverseOrder());
@@ -79,68 +79,65 @@ class Quiz{
         PrintWriter printWriter = new PrintWriter(os);
         float sum = 0;
         for (int i=0; i<answers.size(); i++){
-            if (answers.get(i).equals(questions.get(i).getAnswer())){
-                sum+=questions.get(i).getPoints();
-                printWriter.printf(String.format("%d. %.2f\n",i+1, (float)questions.get(i).getPoints()));
-            }
-            else if (questions.get(i).getType().equals(Type.TF)){
-                printWriter.printf(String.format("%d. 0.00\n",i+1));
-            }
-            else {
-                printWriter.printf(String.format("%d. %.2f\n",i+1,-0.2*questions.get(i).getPoints()));
-                sum-=0.2*questions.get(i).getPoints();
-            }
+            float points = questions.get(i).answerQuestion(answers.get(i));
+            sum+=points;
+            printWriter.printf(String.format("%d. %.2f\n",i+1,points));
         }
         printWriter.printf(String.format("Total points: %.2f",sum));
         printWriter.flush();
     }
 }
 abstract class Question implements Comparable<Question>{
-    Type type;
     private String text;
     private int points;
-    private String answer;
-    public Question(String text, int points, String answer) {
+    public Question(String text, int points) {
         this.text = text;
         this.points = points;
-        this.answer = answer;
-    }
-    public String getAnswer(){
-        return answer;
     }
     public int getPoints() {
         return points;
     }
-    public Type getType(){
-        return type;
-    }
-    @Override
-    public String toString() {
-        if (type.equals(Type.TF))
-            return String.format("True/False Question: %s Points: %d Answer: %s\n",text, points,answer);
-        return String.format("Multiple Choice Question: %s Points %d Answer: %s\n",text, points,answer);
+    public String getText(){
+        return text;
     }
 
     @Override
     public int compareTo(Question o) {
         return points-o.points;
     }
+    abstract float answerQuestion(String studentAnswer);
 }
 class TFQuestion extends Question{
-    public TFQuestion(String text, int points, String answer) {
-        super(text, points, answer);
-        this.type = Type.TF;
+    boolean answer;
+    public TFQuestion(String text, int points, boolean answer) {
+        super(text, points);
+        this.answer = answer;
     }
-
+    @Override
+    public String toString() {
+        return String.format("True/False Question: %s Points: %d Answer: %s\n",getText(), getPoints(),answer?"true":"false");
+    }
+    @Override
+    float answerQuestion(String studentAnswer) {
+        if ((studentAnswer.equals("true")&&answer)||(studentAnswer.equals("false")&&!answer))
+            return getPoints();
+        return 0;
+    }
 }
 class MCQuestion extends Question{
+    String answer;
     public MCQuestion(String text, int points, String answer) {
-        super(text, points, answer);
-        this.type = Type.MC;
+        super(text, points);
+        this.answer = answer;
     }
-}
-enum Type{
-    TF, MC
+    @Override
+    public String toString() {
+        return String.format("Multiple Choice Question: %s Points %d Answer: %s\n",getText(), getPoints(),answer);
+    }
+    @Override
+    float answerQuestion(String studentAnswer) {
+        return answer.equals(studentAnswer)? getPoints(): -(float)0.2*getPoints();
+    }
 }
 class InvalidOperationException extends Exception{
     public InvalidOperationException(String message) {

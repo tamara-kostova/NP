@@ -74,18 +74,16 @@ class Canvas implements Comparable<Canvas>{
         String canvasID = parts[0];
         List<Shape> shapes = new ArrayList<>();
         for (int i=1; i<parts.length-1; i+=2) {
+            Shape toAdd = null;
             if (parts[i].equals("C")) {
-                Circle toAdd = new Circle(Integer.parseInt(parts[i + 1]));
-                if (toAdd.getArea() > maxArea)
-                    throw new IrregularCanvasException(String.format("Canvas %s has a shape with area larger than %.2f", canvasID, maxArea));
-                shapes.add(toAdd);
+                toAdd = new Circle(Integer.parseInt(parts[i + 1]));
             } else {
-                Square toAdd = new Square(Integer.parseInt(parts[i + 1]));
-                if (toAdd.getArea() > maxArea)
+                toAdd = new Square(Integer.parseInt(parts[i + 1]));
+            }
+            if (toAdd.getArea() > maxArea)
                     throw new IrregularCanvasException(String.format("Canvas %s has a shape with area larger than %.2f", canvasID, maxArea));
                 shapes.add(toAdd);
             }
-        }
         return new Canvas(canvasID,shapes);
     }
     public int numberOfShapes(){

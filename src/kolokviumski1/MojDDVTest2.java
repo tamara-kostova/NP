@@ -122,7 +122,7 @@ class Item{
             return price*0.18*0.15;
         if (taxType.equals("B"))
             return price*0.05*0.15;
-        return 0;
+        return 0.0;
     }
 }
 class AmountNotAllowedException extends Exception{

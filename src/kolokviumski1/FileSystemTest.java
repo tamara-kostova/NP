@@ -93,7 +93,7 @@ class File implements IFile{
 
     @Override
     public String getFileInfo(String indent) {
-        return indent+String.format("File name: %10s File size:%10d\n",fileName,fileSize);
+        return indent+String.format("File name: %10s File size:%11d\n",fileName,fileSize);
     }
 
     @Override
@@ -141,9 +141,9 @@ class Folder implements IFile{
     @Override
     public String getFileInfo(String indent) {
         StringBuilder sb = new StringBuilder();
-        sb.append(indent).append(String.format("Folder name: %10s Folder size:%10d\n",folderName,getFileSize()));
+        sb.append(indent).append(String.format("Folder name: %10s Folder size:%11d\n",folderName,getFileSize()));
         for (IFile file : files){
-            sb.append(indent).append(file.getFileInfo("\t"));
+            sb.append(file.getFileInfo(indent+"    "));
         }
         return sb.toString();
     }

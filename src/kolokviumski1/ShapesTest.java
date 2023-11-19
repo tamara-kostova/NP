@@ -61,15 +61,17 @@ class Canvas {
         return shapes.size();
     }
     public void scale(String id, float scaleFactor){
+        Shape temp = null;
         for (int i=0; i<shapes.size(); i++){
             if (shapes.get(i).getId().equals(id)){
-                Shape temp = shapes.get(i);
-                shapes.remove(temp);
-                temp.scale(scaleFactor);
-                int index = place(temp.weight());
-                shapes.add(index,temp);
+                temp = shapes.get(i);
+                break;
             }
         }
+        shapes.remove(temp);
+        temp.scale(scaleFactor);
+        int index = place(temp.weight());
+        shapes.add(index,temp);
     }
     @Override
     public String toString() {

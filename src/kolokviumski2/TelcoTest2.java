@@ -1,5 +1,7 @@
 package kolokviumski2;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,20 +49,20 @@ public class TelcoTest2 {
 
     }
 }
-class TelcoApp {
+class TelcoApp{
+    Map<String, Call> callsByUuid;
     Map<String, List<Call>> callsByNymber;
     Map<String, List<Call>> callsByPair;
-    Map<String, Call> callsByuuid;
 
     public TelcoApp() {
-        callsByuuid = new HashMap<>();
+        callsByUuid = new HashMap<>();
         callsByNymber = new HashMap<>();
         callsByPair = new HashMap<>();
     }
 
-    public void addCall(String uuid, String dialer, String receiver, long timestamp) {
+    public void addCall (String uuid, String dialer, String receiver, long timestamp){
         Call call = new Call(uuid,dialer,receiver,timestamp);
-        callsByuuid.put(uuid,call);
+        callsByUuid.put(uuid,call);
         callsByNymber.putIfAbsent(dialer, new ArrayList<>());
         callsByNymber.get(dialer).add(call);
         callsByNymber.putIfAbsent(receiver, new ArrayList<>());
@@ -68,32 +70,44 @@ class TelcoApp {
         callsByPair.putIfAbsent(dialer+" "+receiver,new ArrayList<>());
         callsByPair.get(dialer+" "+receiver).add(call);
     }
-
-    public void updateCall(String uuid, long timestamp, String action) {
-        callsByuuid.get(uuid).updateCall(timestamp,action);
+    public void updateCall (String uuid, long timestamp, String action){
+        callsByUuid.get(uuid).updateCall(timestamp,action);
     }
-
     public void printChronologicalReport(String phoneNumber) {
         List<Call> callsByNumber = callsByNymber.get(phoneNumber);
-        for (Call call : callsByNumber) {
-            if (call.getDialer().equals(phoneNumber))
-                System.out.println(call.printDialer());
-            else
-                System.out.println(call.printReceiver());
-        }
+        callsByNumber.forEach(call -> {
+            if(call.dialer.equals(phoneNumber)) {
+                if (call.getDuration()==0)
+                    System.out.println(String.format("D %s %d MISSED CALL %s", call.receiver, call.timeStampStarted, DurationConverter.convert(call.getDuration())));
+                else
+                    System.out.println(String.format("D %s %d %d %s", call.receiver, call.timeStampStarted, call.timeStampEnded, DurationConverter.convert(call.getDuration())));
+            }
+            else {
+                if (call.getDuration()==0)
+                    System.out.println(String.format("R %s %d MISSED CALL %s", call.dialer, call.timeStampStarted, DurationConverter.convert(call.getDuration())));
+                else
+                    System.out.println(String.format("R %s %d %d %s", call.dialer, call.timeStampStarted, call.timeStampEnded, DurationConverter.convert(call.getDuration())));
+            }
+        });
     }
-
-    public void printReportByDuration(String phoneNumber) {
-        List<Call> callsByNumber = callsByNymber.get(phoneNumber).stream().sorted(Comparator.comparing(Call::getDuration).thenComparing(Call::getTimestampStart).reversed()).collect(Collectors.toList());
-        for (Call call : callsByNumber) {
-            if (call.getDialer().equals(phoneNumber))
-                System.out.println(call.printDialer());
-            else
-                System.out.println(call.printReceiver());
-        }
+    public void printReportByDuration(String phoneNumber){
+        List<Call> callsByNumber = callsByNymber.get(phoneNumber).stream().sorted(Comparator.comparing(Call::getDuration).thenComparing(Call::getTimeStampStarted).reversed()).collect(Collectors.toList());
+        callsByNumber.forEach(call -> {
+            if(call.dialer.equals(phoneNumber)) {
+                if (call.getDuration()==0)
+                    System.out.println(String.format("D %s %d MISSED CALL %s", call.receiver, call.timeStampStarted, DurationConverter.convert(call.getDuration())));
+                else
+                    System.out.println(String.format("D %s %d %d %s", call.receiver, call.timeStampStarted, call.timeStampEnded, DurationConverter.convert(call.getDuration())));
+            }
+            else {
+                if (call.getDuration()==0)
+                    System.out.println(String.format("R %s %d MISSED CALL %s", call.dialer, call.timeStampStarted, DurationConverter.convert(call.getDuration())));
+                else
+                    System.out.println(String.format("R %s %d %d %s", call.dialer, call.timeStampStarted, call.timeStampEnded, DurationConverter.convert(call.getDuration())));
+            }
+        });
     }
-
-    public void printCallsDuration() {
+    public void printCallsDuration(){
         Map<String,Integer> durations = new HashMap<>();
         for(String pair: callsByPair.keySet()){
             durations.put(pair,callsByPair.get(pair).stream().mapToInt(Call::getDuration).sum());
@@ -107,73 +121,168 @@ class Call{
     String uuid;
     String dialer;
     String receiver;
-    long timestamp;
-    long timestampStart;
-    long timestampEnd;
-    boolean hold = false;
-    boolean answered = false;
-    long holdTimeStamp;
-    int timeHeld;
-    public Call(String uuid, String dialer, String receiver, long timestamp) {
+    long timeStampCalled;
+    long timeStampStarted;
+    long timeStampEnded;
+    long holdStarted = -1;
+    int totalTimeInHold = 0;
+    CallState callState = new CallStartedState(this);
+
+    public Call(String uuid, String dialer, String receiver, long timeStampCalled) {
         this.uuid = uuid;
         this.dialer = dialer;
         this.receiver = receiver;
-        this.timestamp = timestamp;
-        timestampStart = timestamp;
-        timestampEnd = 0;
-        timeHeld = 0;
+        this.timeStampCalled = timeStampCalled;
     }
 
-    public String getDialer() {
-        return dialer;
+    public long getTimeStampStarted() {
+        return timeStampStarted;
     }
 
-    public long getTimestampStart() {
-        return timestampStart;
+    public void updateCall(long timeStamp, String action){
+        if (action.equals("ANSWER"))
+            answer(timeStamp);
+        if (action.equals("END"))
+            end(timeStamp);
+        if (action.equals("HOLD"))
+            hold(timeStamp);
+        if (action.equals("RESUME"))
+            resume(timeStamp);
     }
-
-    public void updateCall(long timestamp, String action) {
-        if (action.equals("ANSWER")){
-            timestampStart = timestamp;
-            answered = true;
-        }
-        if (action.equals("END")){
-            if (hold)
-                timeHeld+=(int) (timestamp-holdTimeStamp);
-            if(!answered)
-                timestampStart = timestamp;
-            timestampEnd = timestamp;
-        }
-        if (action.equals("HOLD")) {
-            hold = true;
-            holdTimeStamp = timestamp;
-        }
-        if (action.equals("RESUME")){
-            hold = false;
-            timeHeld+= (int) (timestamp-holdTimeStamp);
-        }
-
-    }
-    public String printDialer(){
-        if (!answered)
-            return String.format("D %s %s MISSED CALL 00:00",receiver,timestampStart);
-        int seconds = (int) (timestampEnd-timestampStart-timeHeld);
-        int minutes = seconds/60;
-        seconds%=60;
-        return String.format("D %s %s %s %02d:%02d",receiver,timestampStart,timestampEnd,minutes,seconds);
-    }
-    public String printReceiver(){
-        if (!answered)
-            return String.format("R %s %s MISSED CALL 00:00",dialer,timestampStart);
-        int seconds = (int) (timestampEnd-timestampStart-timeHeld);
-        int minutes = seconds/60;
-        seconds%=60;
-        return String.format("R %s %s %s %02d:%02d",dialer,timestampStart,timestampEnd,minutes,seconds);
-    }
-
     public int getDuration(){
-        if (answered)
-            return (int) (timestampEnd - timestampStart-timeHeld);
-        return 0;
+        return (int) (timeStampEnded-timeStampStarted-totalTimeInHold);
+    }
+    public void answer(long timeStamp){
+        callState.answer(timeStamp);
+    }
+    public void end(long timeStamp){
+        callState.end(timeStamp);
+    }
+    public void hold(long timeStamp){
+        callState.hold(timeStamp);
+    }
+    public void resume(long timeStamp){
+        callState.resume(timeStamp);
+    }
+}
+interface ICallState{
+    void answer(long timestamp);
+    void hold (long timestamp);
+    void resume (long timestamp);
+    void end (long timestamp);
+}
+abstract class CallState implements ICallState{
+    Call call;
+
+    public CallState(Call call) {
+        this.call = call;
+    }
+}
+class CallStartedState extends CallState{
+    public CallStartedState(Call call) {
+        super(call);
+    }
+
+    @Override
+    public void answer(long timestamp) {
+        call.timeStampStarted = timestamp;
+        call.callState = new InProgressCallState(call);
+    }
+
+    @Override
+    public void hold(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void resume(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void end(long timestamp) {
+        call.timeStampEnded = timestamp;
+        call.timeStampStarted = timestamp;
+        call.callState = new TerminatedCallState(call);
+    }
+}
+class TerminatedCallState extends CallState{
+    public TerminatedCallState(Call call) {
+        super(call);
+    }
+
+    @Override
+    public void answer(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void hold(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void resume(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void end(long timestamp) {
+        throw new RuntimeException();
+    }
+}
+class InProgressCallState extends CallState{
+    public InProgressCallState(Call call) {
+        super(call);
+    }
+
+    @Override
+    public void answer(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void hold(long timestamp) {
+        call.holdStarted = timestamp;
+        call.callState = new PausedCallState(call);
+    }
+
+    @Override
+    public void resume(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void end(long timestamp) {
+        call.timeStampEnded = timestamp;
+        call.callState = new TerminatedCallState(call);
+    }
+}
+class PausedCallState extends CallState{
+    public PausedCallState(Call call) {
+        super(call);
+    }
+
+    @Override
+    public void answer(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void hold(long timestamp) {
+        throw new RuntimeException();
+    }
+
+    @Override
+    public void resume(long timestamp) {
+        call.totalTimeInHold+=(timestamp-call.holdStarted);
+        call.callState = new InProgressCallState(call);
+    }
+
+    @Override
+    public void end(long timestamp) {
+        call.totalTimeInHold+=(timestamp-call.holdStarted);
+        call.timeStampEnded = timestamp;
+        call.callState = new TerminatedCallState(call);
     }
 }
